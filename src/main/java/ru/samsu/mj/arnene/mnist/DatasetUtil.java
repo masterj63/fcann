@@ -4,25 +4,46 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 
 public class DatasetUtil {
-//    private static final int DEBUG = 10_000; // TODO
-    private static final int DEBUG = Integer.MAX_VALUE; // TODO
+    private static final long SEED = 0L;
 
-    public static List<Digit> readTrainDigits() throws IOException {
+    public static List<Pair> readTrainSet() throws IOException {
+        return shufflePairs(readTrainDigits(), readTrainLabels());
+    }
+
+    public static List<Pair> readTestSet() throws IOException {
+        return shufflePairs(readTestDigits(), readTestLabels());
+    }
+
+    private static List<Pair> shufflePairs(List<Digit> digits, List<Label> labels) throws IOException {
+        Iterator<Digit> digitIterator = digits.iterator();
+        Iterator<Label> labelsIterator = labels.iterator();
+        List<Pair> result = new ArrayList<>(digits.size());
+        while (digitIterator.hasNext() || labelsIterator.hasNext()) {
+            result.add(new Pair(digitIterator.next(), labelsIterator.next()));
+        }
+        Collections.shuffle(result, new Random(SEED));
+        return result;
+    }
+
+    private static List<Digit> readTrainDigits() throws IOException {
         return readImages("train-images-idx3-ubyte");
     }
 
-    public static List<Digit> readTestDigits() throws IOException {
-        return readImages("t10k-images-idx3-ubyte");
-    }
-
-    public static List<Label> readTrainLabels() throws IOException {
+    private static List<Label> readTrainLabels() throws IOException {
         return readLabels("train-labels-idx1-ubyte");
     }
 
-    public static List<Label> readTestLabels() throws IOException {
+    private static List<Digit> readTestDigits() throws IOException {
+        return readImages("t10k-images-idx3-ubyte");
+    }
+
+    private static List<Label> readTestLabels() throws IOException {
         return readLabels("t10k-labels-idx1-ubyte");
     }
 
@@ -33,7 +54,7 @@ public class DatasetUtil {
                 throw new IllegalStateException();
             }
 
-            final int labelsCount = Math.min(dis.readInt(), DEBUG);
+            final int labelsCount = dis.readInt();
             List<Label> result = new ArrayList<>(labelsCount);
             for (int i = 0; i < labelsCount; i++) {
                 result.add(new Label(dis.readUnsignedByte()));
@@ -49,7 +70,7 @@ public class DatasetUtil {
                 throw new IllegalStateException();
             }
 
-            final int imagesCount = Math.min(dis.readInt(), DEBUG);
+            final int imagesCount = dis.readInt();
             ArrayList<Digit> result = new ArrayList<>(imagesCount);
 
             final int row = dis.readInt();
@@ -67,6 +88,24 @@ public class DatasetUtil {
             }
 
             return result;
+        }
+    }
+
+    public static class Pair {
+        private final Digit digit;
+        private final Label label;
+
+        Pair(Digit digit, Label label) {
+            this.digit = digit;
+            this.label = label;
+        }
+
+        public Digit getDigit() {
+            return digit;
+        }
+
+        public Label getLabel() {
+            return label;
         }
     }
 }

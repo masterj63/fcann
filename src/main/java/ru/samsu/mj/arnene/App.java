@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.text.DecimalFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.DoubleStream;
@@ -25,7 +26,7 @@ public class App {
     private static final double ETA = 0.004;
     private static final DecimalFormat FORMATTER = new DecimalFormat("0.###E0");
     private static final ActivationFunction ACTIVATION_FUNCTION = ActivationFunction.SIGMA;
-    private static final int HIDDEN_LAYER_SIZE = 21;
+    private static final int HIDDEN_LAYER_SIZE = 28 * 28;
     private static final File MODELS_DIR = new File("models");
     private static final String ANN_FILE_NAME = String.format("ann.%s.%d",
         ACTIVATION_FUNCTION.name().toLowerCase(), HIDDEN_LAYER_SIZE);
@@ -62,29 +63,29 @@ public class App {
                 return i;
             }
         }
-        throw new IllegalStateException();
+        throw new IllegalStateException(Arrays.toString(vec));
     }
 
-    private Network trainNetwork(List<Digit> digits, List<Label> labels) {
+    private Network trainNetwork(List<DatasetUtil.Pair> pairs) {
         // p108.1
         Network network = new Network.Builder()
             .setActivationFunction(ACTIVATION_FUNCTION)
-            .setInputLayerSize(digits.get(0).getPixelCount())
+            .setInputLayerSize(pairs.get(0).getDigit().getPixelCount())
             .setHiddenLayerSize(HIDDEN_LAYER_SIZE)
             .setOutputLayerSize(DATASET_ADAPTER.getLabelDimension())
             .build();
 
         double q = 0.0;
         // p108.2
-        for (int i = 0; i < digits.size(); i++) {
-            boolean lastIteration = ((1 + i) == digits.size());
+        for (int i = 0; i < pairs.size(); i++) {
+            boolean lastIteration = ((1 + i) == pairs.size());
 
             // p108.3
-            int[] xi = DATASET_ADAPTER.adaptDigit(digits.get(i));
+            int[] xi = DATASET_ADAPTER.adaptDigit(pairs.get(i).getDigit());
             // p108.4 // forward propagation
             PropagationResult propagation = network.propagate(xi);
             double[] aa = propagation.outputActivation;
-            double[] yy = DATASET_ADAPTER.adaptLabel(labels.get(i));
+            double[] yy = DATASET_ADAPTER.adaptLabel(pairs.get(i).getLabel());
             double[] emOutputError = subtract(aa, yy);
             double qi = 0.5 * sumSquare(emOutputError);
             // p108.5 backward propagation
@@ -93,10 +94,10 @@ public class App {
             network.tuneWhm(emOutputError, propagation.outputPreactivation, propagation.hiddenActivation, ETA);
             network.tuneWnh(ehHiddenError, propagation.hiddenPreactivation, xi, ETA);
             // p108.7
-            double newQ = 1.0 * (digits.size() - 1) / digits.size() * q + 1.0 / digits.size() * qi;
+            double newQ = 1.0 * (pairs.size() - 1) / pairs.size() * q + 1.0 / pairs.size() * qi;
             q = newQ;
             // p108.8
-            if (i > 10_000 && Math.min(q, newQ) / Math.max(q, newQ) > 0.999) {
+            if (i > 10_000 && Math.min(q, newQ) / Math.max(q, newQ) > 0.999) { // TODO THRESHOLD
                 lastIteration = true;
             }
 
@@ -104,7 +105,7 @@ public class App {
                 String message = String.format(
                     "%s %.0f%% (%d): q=%s, avg_x_i=%s, out_err=%s, hid_err=%s, nw_avg_nh=%s, nw_avg_hm=%s",
                     new Date(),
-                    100.0 * i / digits.size(),
+                    100.0 * i / pairs.size(),
                     i,
                     FORMATTER.format(q),
                     FORMATTER.format(IntStream.of(xi).average().getAsDouble()),
@@ -137,9 +138,8 @@ public class App {
             }
             System.out.printf("deserialized %s %s%n", network.getActivationFunctionName(), network.getLabel());
         } else {
-            List<Digit> digits = DatasetUtil.readTrainDigits();
-            List<Label> labels = DatasetUtil.readTrainLabels();
-            network = trainNetwork(digits, labels);
+            List<DatasetUtil.Pair> pairs = DatasetUtil.readTrainSet();
+            network = trainNetwork(pairs);
             try (FileOutputStream fos = new FileOutputStream(annFile);
                  ObjectOutputStream oos = new ObjectOutputStream(fos)) {
                 oos.writeObject(network);
@@ -147,14 +147,10 @@ public class App {
             System.out.printf("serialized %s %s%n", network.getActivationFunctionName(), network.getLabel());
         }
 
-        List<Digit> digits = DatasetUtil.readTestDigits();
-        List<Label> labels = DatasetUtil.readTestLabels();
+        List<DatasetUtil.Pair> pairs = DatasetUtil.readTestSet();
 
-        if (digits.size() != labels.size()) {
-            throw new IllegalStateException();
-        }
         double sum = 0.0;
-        int N = digits.size();
+        int N = pairs.size();
 
         class PrintReport {
             final int actualLabel;
@@ -184,9 +180,9 @@ public class App {
         PrintReport[] okPrintReports = new PrintReport[TenDimAdapter.TEN];
 
         for (int i = 0; i < N; i++) {
-            Digit testDigit = digits.get(i);
+            Digit testDigit = pairs.get(i).getDigit();
             double[] actual = network.propagate(DATASET_ADAPTER.adaptDigit(testDigit)).outputActivation;
-            double[] expected = DATASET_ADAPTER.adaptLabel(labels.get(i));
+            double[] expected = DATASET_ADAPTER.adaptLabel(pairs.get(i).getLabel());
             double[] diff = subtract(actual, expected);
 //            double diff2 = diff * diff;
             double l2n = l2norm(diff);
