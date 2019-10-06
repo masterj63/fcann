@@ -10,11 +10,11 @@ public class DatasetUtil {
 //    private static final int DEBUG = 10_000; // TODO
     private static final int DEBUG = Integer.MAX_VALUE; // TODO
 
-    public static List<BooleanDigit> readTrainDigits() throws IOException {
+    public static List<Digit> readTrainDigits() throws IOException {
         return readImages("train-images-idx3-ubyte");
     }
 
-    public static List<BooleanDigit> readTestDigits() throws IOException {
+    public static List<Digit> readTestDigits() throws IOException {
         return readImages("t10k-images-idx3-ubyte");
     }
 
@@ -42,7 +42,7 @@ public class DatasetUtil {
         }
     }
 
-    private static List<BooleanDigit> readImages(String fileName) throws IOException {
+    private static List<Digit> readImages(String fileName) throws IOException {
         try (InputStream is = DatasetUtil.class.getClassLoader().getResourceAsStream(fileName);
              DataInputStream dis = new DataInputStream(is)) {
             if (dis.readInt() != 0x803) {
@@ -50,7 +50,7 @@ public class DatasetUtil {
             }
 
             final int imagesCount = Math.min(dis.readInt(), DEBUG);
-            ArrayList<BooleanDigit> result = new ArrayList<>(imagesCount);
+            ArrayList<Digit> result = new ArrayList<>(imagesCount);
 
             final int row = dis.readInt();
             final int col = dis.readInt();
@@ -63,7 +63,7 @@ public class DatasetUtil {
                         canvasI++;
                     }
                 }
-                result.add(new BooleanDigit(canvas, 0xff));
+                result.add(new ByteDigit(canvas));
             }
 
             return result;
